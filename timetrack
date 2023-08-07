@@ -1,0 +1,253 @@
+#!/bin/bash
+# timetrack.sh
+
+function date_and_time(){
+  date +"%Y-%m-%d_%H-%M-%S"
+}
+
+function current_time(){
+  date +"%H:%M:%S"
+}
+
+function current_date(){
+  date +"%Y-%m-%d"
+}
+
+function erase_line(){
+  echo -en "\r\033[K"
+}
+
+function erase_file_last_line(){
+  sed -i '$d' ./"${script_path}"/sessions/${session_id}.tt
+}
+
+function elapsed_current(){
+  elapsed_time=$(( now_time - start_time ))
+}
+
+function elapsed_session(){
+  elapsed_time=$(( now_time - session_start_time ))
+}
+
+function get_time(){
+  minutes=$(( elapsed_time / 60 ))
+  seconds=$(( elapsed_time % 60 ))
+  hours=$(( minutes / 60))
+  # reset minutes so hours are deducted
+  minutes=$(( minutes - hours * 60 ))
+  days=$(( hours / 24 ))
+  # reset hours so days are deducted
+  hours=$(( hours - days * 24 ))
+}
+
+function capture_time(){
+  total_days=$(( total_days + days ))
+  total_hours=$(( total_hours + hours ))
+  total_minutes=$(( total_minutes + minutes ))
+  total_seconds=$(( total_seconds + seconds ))
+  # as adding time_x to time_y can result in more than 60 or 24
+  # recount the correct time
+  if  [[ "${seconds}" -ge 60 ]]; then
+    seconds=$(( seconds - 60 ))
+    minutes=$(( minutes + 1 ))
+  fi
+  if  [[ "${minutes}" -ge 60 ]]; then
+    minutes=$(( minutes - 60 ))
+    hours=$(( hours + 1 ))
+  fi
+  if  [[ "${hours}" -ge 24 ]]; then
+    hours=$(( hours - 24 ))
+    days=$(( days + 1 ))
+  fi
+}
+
+function total_time(){
+  seconds=$(( total_seconds + seconds ))
+  minutes=$(( total_minutes + minutes ))
+  hours=$(( total_hours + hours))
+  days=$(( total_days + days ))
+  # as adding time_x to time_y can result in more than 60 or 24
+  # recount the correct time
+  if  [[ "${seconds}" -ge 60 ]]; then
+  	seconds=$(( seconds - 60 ))
+	minutes=$(( minutes + 1 ))
+  fi
+  if  [[ "${minutes}" -ge 60 ]]; then
+	minutes=$(( minutes - 60 ))
+  	hours=$(( hours + 1 ))
+  fi
+  if  [[ "${hours}" -ge 24 ]]; then
+  	hours=$(( hours - 24 ))
+	days=$(( days + 1 ))
+  fi
+}
+
+function update_time(){	
+  elapsed_current
+  get_time
+  total_time
+}
+
+function display_time() {
+  if [[ "${days}" -gt 0 ]]; then
+    printf "Duration: ${bold}%02d:%02d:%02d:%02d${bold_n}  \r" "${days}" "${hours}" "${minutes}" "${seconds}"
+  elif [[ "${hours}" -gt 0 ]]; then
+    printf "Duration: %02d:${bold}%02d:%02d:%02d${bold_n}  \r" "${days}" "${hours}" "${minutes}" "${seconds}"
+  elif [[ "${minutes}" -gt 0 ]]; then
+    printf "Duration: %02d:%02d${bold}:%02d:%02d${bold_n}  \r" "${days}" "${hours}" "${minutes}" "${seconds}"
+  elif [[ "${seconds}" -gt 0 ]]; then
+    printf "Duration: %02d:%02d:%02d${bold}:%02d${bold_n}  \r" "${days}" "${hours}" "${minutes}" "${seconds}"
+  fi
+}
+
+function init_session(){
+  local message
+  message="Session - start @ $(current_time) on the $(current_date)"
+  echo "${message}"
+  update_session "Session: ${session_id}"
+  update_session "${message}"
+}
+
+function update_session(){
+  echo "$(date_and_time) timetrack: ${1}" >> "${script_path}"/sessions/"${session_id}".tt    
+}
+
+function update_session_duration(){
+  local d="${days}"
+  local h="${hours}"
+  local m="${minutes}"
+  local s="${seconds}"
+  local duration=$(printf "%02d-%02d-%02d-%02d" "${d}" "${h}" "${m}" "${s}")
+
+  mv ./"${script_path}"/sessions/"${session_id}".tt ./"${script_path}"/sessions/"${session_id}"--duration-"${duration}".tt
+  echo "Session details dumped to sessions/${session_id}--duration-${duration}.tt"
+}
+
+function pause(){
+  erase_line
+  if [ "${paused}" = false ]; then
+    paused=true
+    erase_line
+    howto="(press ${bold}e${bold_n} to exit session, any other key to continue)."
+    message="Pause @ $(current_time)"
+    update_session "${message}"
+    echo ${message} ${howto}
+  else
+    paused=false
+    message="Pause - end  @ $(current_time)"
+    # reset start time
+    start_time=$(date +%s)
+    update_session "${message}"
+    echo "${message}"
+  fi
+}
+
+function exit_script(){
+  if [[ "${exit_flag}" == false ]]; then
+    local message
+    erase_line
+    erase_file_last_line
+    update_session "Session - end @ $(current_time) on the $(current_date)" 
+    message=$(printf "Duration: %02d:%02d:%02d:%02d\r" "${total_days}" "${total_hours}" "${total_minutes}" "${total_seconds}")
+    update_session "${message}"
+    echo "${message}"
+    now_time=$(date +%s)
+    elapsed_session
+    get_time
+    message=$(printf "Session duration (with pauses): %02d:%02d:%02d:%02d\r" "${days}" "${hours}" "${minutes}" "${seconds}")
+    update_session "${message}"
+    update_session ""
+    echo "${message}" 
+    update_session_duration
+    echo "Thank you for using ${bold}timetrack.sh${bold_n}"
+    # re-enable cursor
+    tput cvvis
+    exit_flag=true
+  fi
+  exit
+}
+
+function term_exit(){
+    elapsed_current
+    get_time
+    capture_time
+    exit_script
+}
+
+function trap_exit(){
+  trap term_exit exit
+}
+
+function trap_interaction(){
+  trap pause SIGINT SIGTERM
+}
+
+function globals(){
+  # assign some globals
+  declare -g session="${1}"
+  declare -g session_id="$(date_and_time)""--${session}"
+  declare -g bold=$(tput bold)
+  declare -g bold_n=$(tput sgr0)
+  declare -g session_start_time=$(date +%s)
+  declare -g start_time="${session_start_time}"
+  declare -g now_time="${start_time}"
+  declare -g elapsed_time
+  declare -g days=0
+  declare -g total_days=0
+  declare -g hours=0
+  declare -g total_hours=0
+  declare -g minutes=0
+  declare -g total_minutes=0
+  declare -g seconds=0
+  declare -g total_seconds=0
+  declare -g paused=false
+  declare -g exit_flag=false
+  declare -g script_path="$BASH_SOURCE"
+  script_path=${script_path%%timetrack}
+}
+
+function main(){
+  globals "${1-default}"
+  # start message
+  echo "Time tracking ${bold}${session} session @ $(current_date) ${bold_n}" 
+  echo "Press ${bold}ctrl+c${bold_n} to pause the time counter."
+  # trap is used to capture ctrl+c
+  trap_interaction
+  trap_exit
+  # disable cursor
+  tput civis
+  # init session log
+  init_session
+  # main loop
+   while true; do
+    if [  "${paused}" = false ]; then
+      # if the script is unpaused, display time
+      update_time
+      display_time
+      sleep 1
+      now_time=$(date +%s)
+    else
+      elapsed_current
+      get_time
+      capture_time
+      # if the script is paused, wait for user action
+      erase_line
+      trap exit_script SIGINT
+       while read -n1 key; do
+        # if e is pressed while pause, dump data and quit script
+        if [[ "${key}" == "e" ]]; then
+          exit_script
+          exit
+         else
+          # if another key is pressed reset pause status
+          trap_interaction
+          pause
+          break
+        fi
+      done
+    fi
+  done
+}
+
+# launch main function
+main "${@}"
