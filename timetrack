@@ -138,6 +138,10 @@ function pause(){
     message="Pause - end  @ $(current_time)"
     # reset start time
     start_time=$(date +%s)
+    if [[ "${multi_session}" == true ]]; then
+      echo "Please, give a name to this new session segment:"
+      read session_name
+    fi
     update_session "${message}"
     echo "${message}"
   fi
