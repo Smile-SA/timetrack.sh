@@ -1,5 +1,6 @@
 #!/bin/bash
-# timetrack.sh
+# timetrack.sh, a time tracking tool
+# developped and used by SMILE France teams
 
 function date_and_time(){
   date +"%Y-%m-%d_%H-%M-%S"
@@ -184,10 +185,11 @@ function trap_interaction(){
 
 function globals(){
   # assign some globals
-  declare -g session="${1}"
-  declare -g session_id="$(date_and_time)""--${session}"
-  declare -g bold=$(tput bold)
-  declare -g bold_n=$(tput sgr0)
+  # cli options
+  declare -g session_name="default"
+  declare -g multi_session="false"
+  
+  declare -g session_id="$(date_and_time)""--${session_name}"
   declare -g session_start_time=$(date +%s)
   declare -g start_time="${session_start_time}"
   declare -g now_time="${start_time}"
@@ -204,12 +206,32 @@ function globals(){
   declare -g exit_flag=false
   declare -g script_path="$BASH_SOURCE"
   script_path=${script_path%%timetrack}
+
+  declare -g bold=$(tput bold)
+  declare -g bold_n=$(tput sgr0)
+}
+
+function cli(){
+  while getopts 'ms:' flag; do
+    case "${flag}" in
+      m) multi_session='true' ;;
+      s) session_name="${OPTARG}" ;;
+    esac
+  done
+  
+  if [[ -n "${1}" && "${session_name}" == "default" ]]; then 
+    session_name="${1}"
+  fi
 }
 
 function main(){
-  globals "${1-default}"
+  globals
+  cli "${@}"
+
+  echo $session_name
+
   # start message
-  echo "Time tracking ${bold}${session} session @ $(current_date) ${bold_n}" 
+  echo "Time tracking ${bold}${session_name} session @ $(current_date) ${bold_n}" 
   echo "Press ${bold}ctrl+c${bold_n} to pause the time counter."
   # trap is used to capture ctrl+c
   trap_interaction
