@@ -110,7 +110,7 @@ function init_session(){
 }
 
 function update_session(){
-  echo "$(date_and_time) timetrack: ${1}" >> "${script_path}"/sessions/"${session_id}".tt    
+  echo "$(date_and_time) timetrack "${session_name}": ${1}" >> "${script_path}"/sessions/"${session_id}".tt    
 }
 
 function update_session_duration(){
@@ -135,13 +135,24 @@ function pause(){
     echo ${message} ${howto}
   else
     paused=false
-    message="Pause - end  @ $(current_time)"
+    if [[ "${multi_session}" == true ]]; then
+      echo "Please, give a name to this new session segment (or leave empty to pursue):"
+      read new_session_name
+      if [[ -n "${new_session_name}" ]]; then
+        message="Pause - end  @ $(current_time)"
+        update_session "${message}"
+        message="Session - end  @ $(current_time)"
+        update_session "${message}"
+        session_name="${new_session_name}"
+        message="Session - start  @ $(current_time)"
+      else 
+        message="Pause - end  @ $(current_time)"
+      fi 
+    else
+      message="Pause - end  @ $(current_time)"
+    fi
     # reset start time
     start_time=$(date +%s)
-    if [[ "${multi_session}" == true ]]; then
-      echo "Please, give a name to this new session segment:"
-      read session_name
-    fi
     update_session "${message}"
     echo "${message}"
   fi
@@ -192,8 +203,6 @@ function globals(){
   # cli options
   declare -g session_name="default"
   declare -g multi_session="false"
-  
-  declare -g session_id="$(date_and_time)""--${session_name}"
   declare -g session_start_time=$(date +%s)
   declare -g start_time="${session_start_time}"
   declare -g now_time="${start_time}"
@@ -218,7 +227,7 @@ function globals(){
 function cli(){
   while getopts 'ms:' flag; do
     case "${flag}" in
-      m) multi_session='true' ;;
+      m) multi_session="true" ;;
       s) session_name="${OPTARG}" ;;
     esac
   done
@@ -231,6 +240,8 @@ function cli(){
 function main(){
   globals
   cli "${@}"
+  
+  declare -g session_id="$(date_and_time)""--${session_name}"
 
   echo $session_name
 
