@@ -19,7 +19,7 @@ function erase_line(){
 }
 
 function erase_file_last_line(){
-  sed -i '$d' ./"${script_path}"/sessions/${session_id}.tt
+  sed -i '$d' "${script_path}"/sessions/${session_id}.tt
 }
 
 function elapsed_current(){
