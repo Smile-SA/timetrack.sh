@@ -132,7 +132,7 @@ function pause(){
     howto="(press ${bold}e${bold_n} to exit session, any other key to continue)."
     message="Pause @ $(current_time)"
     update_session "${message}"
-    echo ${message} ${howto}
+    echo -e '\e[0;31m'${message}'\e[0;37m' ${howto}
   else
     paused=false
     if [[ "${multi_session}" == true ]]; then
