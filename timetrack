@@ -120,7 +120,7 @@ function update_session_duration(){
   local s="${seconds}"
   local duration=$(printf "%02d-%02d-%02d-%02d" "${d}" "${h}" "${m}" "${s}")
 
-  mv "${script_path}"sessions/"${session_id}".tt ./"${script_path}"/sessions/"${session_id}"--duration-"${duration}".tt
+  mv "${script_path}"sessions/"${session_id}".tt "${script_path}"/sessions/"${session_id}"--duration-"${duration}".tt
   echo "Session details dumped to sessions/${session_id}--duration-${duration}.tt"
 }
 
